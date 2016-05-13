@@ -21,5 +21,9 @@
   "scripts": {
     "test": "mocha"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "dependencies": {
+    "chalk": "^1.1.3",
+    "lodash": "^4.12.0"
+  }
 }

@@ -1,12 +1,17 @@
 #!/usr/bin/env node
-
 /**
  * Module dependencies.
  */
 
 var migrate = require('../')
-  , join = require('path').join
-  , fs = require('fs');
+    , join = require('path').join
+    , fs = require('fs')
+    , path = require('path')
+    , _ = require('lodash');
+const chalk = require('chalk');
+var readLine = require('readline');
+var set;
+var arg;
 
 /**
  * Arguments.
@@ -18,197 +23,335 @@ var args = process.argv.slice(2);
  * Option defaults.
  */
 
-var options = { args: [] };
+var options = {
+    args: [],
+    force: false,
+    redoFile: null,
+    seedAfterMigrate: false,
+    template: [
+        '\'use strict\''
+        , ''
+        , 'exports.up = function(next) {'
+        , '  next();'
+        , '};'
+        , ''
+        , 'exports.down = function(next) {'
+        , '  next();'
+        , '};'
+        , ''
+    ].join('\n')
+};
 
-/**
- * Current working directory.
- */
+// parse arguments
 
-var cwd;
+while (args.length) {
+    arg = args.shift();
+    switch (true) {
+        case arg.match(/^(\?|-h|--help|help)$/i) !== null:
+            showHelp();
+            break;
+        case arg.match(/^(-c|--chdir)$/i) != null:
+            process.chdir(required());
+            break;
+        case arg.match(/^--state-file$/i) !== null:
+            options.stateFile = required();
+            break;
+        case arg.match(/^--template-file$/i) !== null:
+            options.template = fs.readFileSync(required());
+            break;
+        case arg.match(/^(-s|--seed)$/i) !== null:
+            options.seedAfterMigrate = true;
+            break;
+        case arg.match(/^(-f|--force)$/i) !== null:
+            options.force = true;
+            break;
+        case arg.match(/^\d+.*\.js$/i) !== null:
+            options.file = options.file || args.match(/^\d+.*\.js$/i);
+            break;
+        case arg.match(/^(up|down|seed|redo)$/i) !== null:
+            options.command = arg.match(/^(up|down|seed|redo)$/i)[1].toLowerCase();
+            break;
+        default:
+            if (options.command) {
+                options.args.push(arg);
+            } else {
+                options.command = arg;
+            }
+            break;
+    }
+}
 
-/**
- * Usage information.
- */
+// set the defaults if not passed in...
+options.command = options.command || 'up';
+options.stateFile = options.stateFile || join('migrations', '.migrate');
 
-var usage = [
-    ''
-  , '  Usage: migrate [options] [command]'
-  , ''
-  , '  Options:'
-  , ''
-  , '     -c, --chdir <path>      change the working directory'
-  , '     --state-file <path>     set path to state file (migrations/.migrate)'
-  , '     --template-file <path>  set path to template file to use for new migrations'
-  , '  Commands:'
-  , ''
-  , '     down   [name]    migrate down till given migration'
-  , '     up     [name]    migrate up till given migration (the default command)'
-  , '     create [title]   create a new migration file with optional [title]'
-  , ''
-].join('\n');
+// create ./migrations
+try {
+    fs.mkdirSync('migrations', 0774);
+} catch (err) {
+    // ignore
+}
 
-/**
- * Migration template.
- */
+if (~['up', 'down', 'redo'].indexOf(options.command)) {
+    try {
+        set = migrate.load(options.stateFile, 'migrations');
+        if (!set.migrations || set.migrations.length === 0) {
+            abort('There are no migrations found! Create a new migration first by using: \'migrate create\'');
+        }
+        set.on('migration', function(migration, direction) {
+            log(direction, migration.title);
+        });
 
-var template = [
-    '\'use strict\''
-  , ''
-  , 'exports.up = function(next) {'
-  , '  next();'
-  , '};'
-  , ''
-  , 'exports.down = function(next) {'
-  , '  next();'
-  , '};'
-  , ''
-].join('\n');
+        if (options.command === 'redo' && set.migrations.length > 0) {
+            options.redoFile = set.migrations[set.pos - 1].title
+        }
+        // check if the specified file is a valid file in the migration set.
+        if (options.file) {
+            if (!_.find(set.migrations, function(migration) {
+                    return migration.title.toLowerCase() === options.file.toLowerCase()
+                })) {
+                console.log(chalk.bgRed('The migration file: \'' + options.file + '\', that was specified, is not valid! You will be prompted to select a file manually'));
+                options.file = null;
+            }
+        }
+    } catch (e) {
+        abort('Unable to initialize migrations -> Exiting!');
+    }
+}
+
+switch (options.command) {
+    case 'up':
+    case 'down':
+    case 'redo':
+        if (options.file) {
+            handleSelectedFile(options.file, options.redoFile);
+        } else {
+            selectFile(handleSelectedFile);
+        }
+        break;
+    case 'seed':
+        doSeed();
+        break;
+    case 'create':
+        create.apply(this, options.args);
+        break;
+    default:
+        abort('unknown command "' + options.command + '"');
+        break;
+}
+
+// Private functions below
 
 // require an argument
 
 function required() {
-  if (args.length) return args.shift();
-  abort(arg + ' requires an argument');
+    if (args.length) {
+        return args.shift();
+    }
+    abort(arg + ' requires an argument');
 }
 
 // abort with a message
 
 function abort(msg) {
-  console.error('  %s', msg);
-  process.exit(1);
+    console.log(chalk.bgRed(msg));
+    process.exit(1);
 }
 
-// parse arguments
+function doSeed() {
+    var dir = path.resolve('tools');
+    console.log(chalk.bold('Start seeding...'));
+    require(path.join(dir, 'seed.js'))(function() {
+        console.log(chalk.green('Seeding finished!'));
+        process.exit();
+    });
+}
 
-var arg;
-while (args.length) {
-  arg = args.shift();
-  switch (arg) {
-    case '-h':
-    case '--help':
-    case 'help':
-      console.log(usage);
-      process.exit();
-      break;
-    case '-c':
-    case '--chdir':
-      process.chdir(cwd = required());
-      break;
-    case '--state-file':
-      options.stateFile = required();
-      break;
-    case '--template-file':
-      template = fs.readFileSync(required());
-      break;
-    default:
-      if (options.command) {
-        options.args.push(arg);
-      } else {
-        options.command = arg;
-      }
-  }
+function handleSelectedFile(file, redoFile) {
+    if (file) {
+        doMigration(file, redoFile);
+    }
+    else {
+        abort('No valid migration file found! Migrate cannot continue -> exiting!');
+    }
+}
+
+function doMigration(file, redoFile) {
+    var migrationCallback = function(err) {
+        if (err) {
+            throw err;
+        }
+        console.log(chalk.green('Migration completed!'));
+        if (options.seedAfterMigrate) {
+            doSeed();
+        } else {
+            process.exit();
+        }
+    };
+
+    switch (options.command) {
+        case 'redo':
+            console.log(chalk.bold('Migrating down 2 and including: ' + file));
+            set.down(file, function(err) {
+                if (err) {
+                    throw err;
+                }
+                console.log(chalk.bold('Migrating up 2 and including: ' + redoFile));
+                set.up(redoFile, migrationCallback)
+            });
+            break;
+        case 'up':
+            console.log(chalk.bold('Migrating up 2 and including: ' + file));
+            set.up(file, migrationCallback);
+            break;
+        case 'down':
+            console.log(chalk.bold('Migrating down 2 and including: ' + file));
+            set.down(file, migrationCallback);
+            break;
+        default:
+            abort('doMigration() Unknown command!');
+            break;
+    }
+}
+
+function selectFile(callback) {
+    if ((options.command === 'up' && set.pos === set.migrations.length) || options.command === 'down' && set.pos === 0) {
+        console.log(chalk.red('You are up-2-date! There is nothing to migrate \'' + chalk.bold(options.command) + '\' 2!'));
+        process.exit();
+    }
+    if (options.force) {
+        switch (options.command) {
+            case 'up':
+                callback(set.migrations[set.migrations.length - 1].title, options.redoFile);
+                return;
+            case 'down':
+            case 'redo':
+                callback(set.migrations[0].title, options.redoFile);
+                return;
+        }
+    }
+
+    var counter = 0;
+    var files = {};
+    switch (options.command) {
+        case 'up':
+            if (set.pos + 1 === set.migrations.length) {
+                callback(set.migrations[set.migrations.length - 1].title);
+                return;
+            }
+            console.log(chalk.bold('Available migrations to migrate \'up\' 2:'));
+            for (var up = set.pos + 1; up <= set.migrations.length; up++) {
+                files[++counter] = set.migrations[up - 1].title;
+                console.log(chalk.bold(_.padStart(counter, 6, ' ')) + ': ' + chalk.dim(set.migrations[up - 1].title));
+            }
+            break;
+        case 'down':
+            if (set.pos - 1 === 0) {
+                callback(set.migrations[0].title);
+                return;
+            }
+            console.log(chalk.bold('Available migrations to migrate \'down\' 2:'));
+            for (var down = 0; down < set.pos; down++) {
+                files[++counter] = set.migrations[down].title;
+                console.log(chalk.bold(_.padStart(counter, 6, ' ')) + ': ' + chalk.dim(set.migrations[down].title));
+            }
+            break;
+        case 'redo':
+            console.log(chalk.bold('Migrations that can be re-done:'));
+            for (var redo = 0; redo < set.pos; redo++) {
+                files[++counter] = set.migrations[redo].title;
+                console.log(chalk.bold(_.padStart(counter, 6, ' ')) + ': ' + chalk.dim(set.migrations[redo].title));
+            }
+            break;
+    }
+
+    function ask() {
+        var rl = readLine.createInterface({
+            input: process.stdin,
+            output: process.stdout
+        });
+
+        rl.question('Please enter the number of the migration or type \'q(uit)\' to exit: ',
+            function(answer) {
+                rl.close();
+                if (answer.match(/^q(uit)*$/i)) {
+                    process.exit();
+                }
+                answer = answer.match(/^\d+$/);
+                if (answer && files.hasOwnProperty(answer)) {
+                    callback(files[answer], redoFile);
+                } else {
+                    ask();
+                }
+            });
+    }
+
+    ask();
 }
 
 /**
  * Log a keyed message.
  */
-
 function log(key, msg) {
-  console.log('  \033[90m%s :\033[0m \033[36m%s\033[0m', key, msg);
+    console.log(chalk.bold(key) + ' : ' + chalk.cyan(msg));
 }
 
 /**
  * Slugify the given `str`.
  */
-
 function slugify(str) {
-  return str.replace(/\s+/g, '-');
+    return str.replace(/\s+/g, '-');
 }
-
-// create ./migrations
-
-try {
-  fs.mkdirSync('migrations', 0774);
-} catch (err) {
-  // ignore
-}
-
-// commands
-
-var commands = {
-
-  /**
-   * up [name]
-   */
-
-  up: function(migrationName){
-    performMigration('up', migrationName);
-  },
-
-  /**
-   * down [name]
-   */
-
-  down: function(migrationName){
-    performMigration('down', migrationName);
-  },
-
-  /**
-   * create [title]
-   */
-
-  create: function(){
-    var curr = Date.now()
-      , title = slugify([].slice.call(arguments).join(' '));
-    title = title ? curr + '-' + title : curr;
-    create(title);
-  }
-};
 
 /**
  * Create a migration with the given `name`.
  *
- * @param {String} name
  */
 
-function create(name) {
-  var path = join('migrations', name + '.js');
-  log('create', join(process.cwd(), path));
-  fs.writeFileSync(path, template);
+function create() {
+    var curr = Date.now()
+        , title = slugify([].slice.call(arguments).join(' '));
+    title = title ? curr + '-' + title : curr;
+    var path = join('migrations', title + '.js');
+    log('create', join(process.cwd(), path));
+    fs.writeFileSync(path, options.template);
 }
 
-/**
- * Perform a migration in the given `direction`.
- *
- * @param {Number} direction
- */
-
-function performMigration(direction, migrationName) {
-  var state = options.stateFile || join('migrations', '.migrate');
-  var set = migrate.load(state, 'migrations');
-
-  set.on('migration', function(migration, direction){
-    log(direction, migration.title);
-  });
-
-  var migrationPath = migrationName
-    ? join('migrations', migrationName)
-    : migrationName;
-
-  set[direction](migrationName, function (err) {
-    if (err) {
-      log('error', err);
-      process.exit(1);
-    }
-
-    log('migration', 'complete');
-    process.exit(0);
-  });
+function showHelp() {
+    console.log(chalk.bold(_.repeat('*', 100)));
+    console.log(chalk.bold('* '));
+    console.log(chalk.bold('* Execute: ') + 'migrate ' + chalk.cyan('[' + 'command' + chalk.bold('=\'') + chalk.green('up') + chalk.bold('\'') + '] [filename] [options]') + ' ');
+    console.log(chalk.bold('* ') + '');
+    console.log(chalk.bold('* ') + chalk.bold('Command:'));
+    console.log(chalk.bold('* '));
+    console.log(chalk.bold('* ') + ' up   [name]  migrate up till given migration (the default command)');
+    console.log(chalk.bold('* ') + ' down [name]  migrate down till given migration');
+    console.log(chalk.bold('* ') + ' redo [name]  migrate down till given migration and back up again to where it migrated down from.');
+    console.log(chalk.bold('* ') + ' seed         using \'seed\' as a command results in ' + chalk.bold('\'seeding\'') + ' only.');
+    console.log(chalk.bold('* '));
+    console.log(chalk.bold('* name: ') + 'This is the filename of the migration.');
+    console.log(chalk.bold('* ') + '      When the ' + chalk.bold('filename') + ' is omitted and there is more than 1 file available, you will be');
+    console.log(chalk.bold('* ') + '      asked to select a file from a list.');
+    console.log(chalk.bold('* '));
+    console.log(chalk.bold('* Options: '));
+    console.log(chalk.bold('* '));
+    console.log(chalk.bold('* ') + ' -c, --chdir     <path>  change the working directory');
+    console.log(chalk.bold('* ') + ' --state-file    <path>  set path to state file (migrations/.migrate)');
+    console.log(chalk.bold('* ') + ' --template-file <path>  set path to template file to use for new migrations');
+    console.log(chalk.bold('* ') + ' -f, --force             passing this option asks no questions and goes all the way up or down!');
+    console.log(chalk.bold('* ') + ' -s, --seed              using \'seed\' as an option will perform ' + chalk.bold('\'seeding\'') + ' when ' + chalk.bold('\'migrating\'') + ' has finished!)');
+    console.log(chalk.bold('* '));
+    console.log(chalk.bold('* Some examples:'));
+    console.log(chalk.bold('* '));
+    console.log(chalk.bold('* ') + chalk.bold('migrate') + '            Will perform an incremental migrate ' + chalk.bold('up') + ' if there is only 1 migration, when');
+    console.log(chalk.bold('* ') + '                    there are more files to migrate, you will be prompted to select a file');
+    console.log(chalk.bold('* ') + '                    to migrate to.');
+    console.log(chalk.bold('* ') + chalk.bold('migrate up -f') + '      Will perform an incremental migrate ' + chalk.bold('up') + ' to the last available migration file.');
+    console.log(chalk.bold('* ') + chalk.bold('migrate down') + '       Will ask you to which point in time you want to perform a migrate ' + chalk.bold('down') + ' to.');
+    console.log(chalk.bold('* ') + chalk.bold('migrate down 1316027432511-add-pets.js'));
+    console.log(chalk.bold('* ') + '                    Will migrate down to and including the given filename.');
+    console.log(chalk.bold('* ') + chalk.bold('migrate down -f') + '    Will perform a full migrate ' + chalk.bold('down') + chalk.red.bold(' clearing the entire') + ' database.');
+    console.log(chalk.bold('* ') + chalk.bold('migrate redo -f -s') + ' Will perform a full migrate ' + chalk.bold('down') + ' and ' + chalk.bold('up') + ' and will ' + chalk.bold('seed') + ' afterwards.');
+    console.log(chalk.bold(_.repeat('*', 100)));
+    process.exit();
 }
-
-// invoke command
-
-var command = options.command || 'up';
-if (!(command in commands)) abort('unknown command "' + command + '"');
-command = commands[command];
-command.apply(this, options.args);
