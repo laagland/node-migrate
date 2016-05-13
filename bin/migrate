@@ -279,7 +279,7 @@ function selectFile(callback) {
                 }
                 answer = answer.match(/^\d+$/);
                 if (answer && files.hasOwnProperty(answer)) {
-                    callback(files[answer], redoFile);
+                    callback(files[answer], options.redoFile);
                 } else {
                     ask();
                 }
