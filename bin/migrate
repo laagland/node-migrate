@@ -66,7 +66,7 @@ while (args.length) {
             options.force = true;
             break;
         case arg.match(/^\d+.*\.js$/i) !== null:
-            options.file = options.file || args.match(/^\d+.*\.js$/i);
+            options.file = options.file || arg.match(/^\d+.*\.js$/i);
             break;
         case arg.match(/^(up|down|seed|redo|list)$/i) !== null:
             options.command = arg.match(/^(up|down|seed|redo|list)$/i)[1].toLowerCase();
