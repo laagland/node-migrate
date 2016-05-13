@@ -68,8 +68,8 @@ while (args.length) {
         case arg.match(/^\d+.*\.js$/i) !== null:
             options.file = options.file || args.match(/^\d+.*\.js$/i);
             break;
-        case arg.match(/^(up|down|seed|redo)$/i) !== null:
-            options.command = arg.match(/^(up|down|seed|redo)$/i)[1].toLowerCase();
+        case arg.match(/^(up|down|seed|redo|list)$/i) !== null:
+            options.command = arg.match(/^(up|down|seed|redo|list)$/i)[1].toLowerCase();
             break;
         default:
             if (options.command) {
@@ -92,7 +92,7 @@ try {
     // ignore
 }
 
-if (~['up', 'down', 'redo'].indexOf(options.command)) {
+if (~['up', 'down', 'redo', 'list'].indexOf(options.command)) {
     try {
         set = migrate.load(options.stateFile, 'migrations');
         if (!set.migrations || set.migrations.length === 0) {
@@ -128,6 +128,9 @@ switch (options.command) {
         } else {
             selectFile(handleSelectedFile);
         }
+        break;
+    case 'list':
+        showList();
         break;
     case 'seed':
         doSeed();
@@ -165,6 +168,13 @@ function doSeed() {
         console.log(chalk.green('Seeding finished!'));
         process.exit();
     });
+}
+
+function showList() {
+    for (var i = 0; i < set.migrations.length; i++) {
+        console.log(chalk.bold(_.padStart(i + 1, 6, ' ')) + ': ' + set.migrations[i].title + ' (' + (set.pos - 1 <= 0 ? chalk.green('processed') : chalk.red('not processed yet')) + ')');
+    }
+    process.exit();
 }
 
 function handleSelectedFile(file, redoFile) {
