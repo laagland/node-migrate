@@ -82,7 +82,10 @@ while (args.length) {
 }
 
 // set the defaults if not passed in...
-options.command = options.command || 'up';
+if (!options.command) {
+    options.command = 'up';
+    options.force = true;
+}
 options.stateFile = options.stateFile || join('migrations', '.migrate');
 
 // create ./migrations
