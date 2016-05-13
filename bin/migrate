@@ -338,6 +338,7 @@ function showHelp() {
     console.log(chalk.bold('* ') + ' down   [name]  migrate down till given migration');
     console.log(chalk.bold('* ') + ' create [name]  create a new migrate');
     console.log(chalk.bold('* ') + ' redo   [name]  migrate down till given migration and back up again to where it migrated down from.');
+    console.log(chalk.bold('* ') + ' list           shows all available migrations and their current processing state.');
     console.log(chalk.bold('* ') + ' seed           using \'seed\' as a command results in ' + chalk.bold('\'seeding\'') + ' only.');
     console.log(chalk.bold('* '));
     console.log(chalk.bold('* name: ') + 'This is the filename of the migration.');
