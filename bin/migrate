@@ -324,10 +324,11 @@ function showHelp() {
     console.log(chalk.bold('* ') + '');
     console.log(chalk.bold('* ') + chalk.bold('Command:'));
     console.log(chalk.bold('* '));
-    console.log(chalk.bold('* ') + ' up   [name]  migrate up till given migration (the default command)');
-    console.log(chalk.bold('* ') + ' down [name]  migrate down till given migration');
-    console.log(chalk.bold('* ') + ' redo [name]  migrate down till given migration and back up again to where it migrated down from.');
-    console.log(chalk.bold('* ') + ' seed         using \'seed\' as a command results in ' + chalk.bold('\'seeding\'') + ' only.');
+    console.log(chalk.bold('* ') + ' up     [name]  migrate up till given migration (the default command)');
+    console.log(chalk.bold('* ') + ' down   [name]  migrate down till given migration');
+    console.log(chalk.bold('* ') + ' create [name]  create a new migrate');
+    console.log(chalk.bold('* ') + ' redo   [name]  migrate down till given migration and back up again to where it migrated down from.');
+    console.log(chalk.bold('* ') + ' seed           using \'seed\' as a command results in ' + chalk.bold('\'seeding\'') + ' only.');
     console.log(chalk.bold('* '));
     console.log(chalk.bold('* name: ') + 'This is the filename of the migration.');
     console.log(chalk.bold('* ') + '      When the ' + chalk.bold('filename') + ' is omitted and there is more than 1 file available, you will be');
@@ -343,15 +344,15 @@ function showHelp() {
     console.log(chalk.bold('* '));
     console.log(chalk.bold('* Some examples:'));
     console.log(chalk.bold('* '));
-    console.log(chalk.bold('* ') + chalk.bold('migrate') + '            Will perform an incremental migrate ' + chalk.bold('up') + ' if there is only 1 migration, when');
+    console.log(chalk.bold('* ') + chalk.bold('migrate') + '             Will perform an incremental migrate ' + chalk.bold('up') + ' if there is only 1 migration, when');
     console.log(chalk.bold('* ') + '                    there are more files to migrate, you will be prompted to select a file');
     console.log(chalk.bold('* ') + '                    to migrate to.');
-    console.log(chalk.bold('* ') + chalk.bold('migrate up -f') + '      Will perform an incremental migrate ' + chalk.bold('up') + ' to the last available migration file.');
-    console.log(chalk.bold('* ') + chalk.bold('migrate down') + '       Will ask you to which point in time you want to perform a migrate ' + chalk.bold('down') + ' to.');
+    console.log(chalk.bold('* ') + chalk.bold('migrate up -f') + '       Will perform an incremental migrate ' + chalk.bold('up') + ' to the last available migration file.');
+    console.log(chalk.bold('* ') + chalk.bold('migrate down') + '        Will ask you to which point in time you want to perform a migrate ' + chalk.bold('down') + ' to.');
     console.log(chalk.bold('* ') + chalk.bold('migrate down 1316027432511-add-pets.js'));
     console.log(chalk.bold('* ') + '                    Will migrate down to and including the given filename.');
-    console.log(chalk.bold('* ') + chalk.bold('migrate down -f') + '    Will perform a full migrate ' + chalk.bold('down') + chalk.red.bold(' clearing the entire') + ' database.');
-    console.log(chalk.bold('* ') + chalk.bold('migrate redo -f -s') + ' Will perform a full migrate ' + chalk.bold('down') + ' and ' + chalk.bold('up') + ' and will ' + chalk.bold('seed') + ' afterwards.');
+    console.log(chalk.bold('* ') + chalk.bold('migrate down -f') + '     Will perform a full migrate ' + chalk.bold('down') + chalk.red.bold(' clearing the entire') + ' database.');
+    console.log(chalk.bold('* ') + chalk.bold('migrate redo -f -s') + '  Will perform a full migrate ' + chalk.bold('down') + ' and ' + chalk.bold('up') + ' and will ' + chalk.bold('seed') + ' afterwards.');
     console.log(chalk.bold(_.repeat('*', 100)));
     process.exit();
 }
