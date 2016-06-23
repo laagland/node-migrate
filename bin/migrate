@@ -29,14 +29,28 @@ var options = {
     redoFile: null,
     seedAfterMigrate: false,
     template: [
-        '\'use strict\''
+        '\'use strict\';'
+        , ''
+        , 'var fs = require(\'fs\');'
+        , 'var mysql = require(\'mysql\');'
+        , 'var db = require(\'./db.js\');'
         , ''
         , 'exports.up = function(next) {'
-        , '  next();'
+        , '    db.query(fs.readFileSync(\'./migrations/sql/%file%.up.sql\').toString(), function(err, result) {'
+        , '        if (err) {'
+        , '            console.log(err);'
+        , '        }'
+        , '        next();'
+        , '    });'
         , '};'
         , ''
         , 'exports.down = function(next) {'
-        , '  next();'
+        , '    db.query(fs.readFileSync(\'./migrations/sql/%file%.down.sql\').toString(), function(err, result) {'
+        , '        if (err) {'
+        , '            console.log(err);'
+        , '        }'
+        , '        next();'
+        , '    });'
         , '};'
         , ''
     ].join('\n')
@@ -324,10 +338,13 @@ function slugify(str) {
 function create() {
     var curr = Date.now()
         , title = slugify([].slice.call(arguments).join(' '));
+    var templateTitle = title;
     title = title ? curr + '-' + title : curr;
     var path = join('migrations', title + '.js');
     log('create', join(process.cwd(), path));
-    fs.writeFileSync(path, options.template);
+    fs.writeFileSync(path, options.template.replace(/%file%/g, templateTitle));
+    fs.writeFileSync(join('migrations', 'sql', templateTitle + '.up.sql'), '# PLACE YOUR \'UP\' MIGRATION SQL HERE!');
+    fs.writeFileSync(join('migrations', 'sql', templateTitle + '.down.sql'), '# PLACE YOUR \'DOWN\' MIGRATION SQL HERE!');
 }
 
 function showHelp() {
