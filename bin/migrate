@@ -338,13 +338,42 @@ function slugify(str) {
 function create() {
     var curr = Date.now()
         , title = slugify([].slice.call(arguments).join(' '));
-    var templateTitle = title;
-    title = title ? curr + '-' + title : curr;
-    var path = join('migrations', title + '.js');
-    log('create', join(process.cwd(), path));
-    fs.writeFileSync(path, options.template.replace(/%file%/g, templateTitle));
-    fs.writeFileSync(join('migrations', 'sql', templateTitle + '.up.sql'), '# PLACE YOUR \'UP\' MIGRATION SQL HERE!');
-    fs.writeFileSync(join('migrations', 'sql', templateTitle + '.down.sql'), '# PLACE YOUR \'DOWN\' MIGRATION SQL HERE!');
+
+    getUniqueTemplateName(title, function(templateName) {
+        title = title ? curr + '-' + title : curr;
+        var path = join('migrations', title + '.js');
+        log('create', join(process.cwd(), path));
+        fs.writeFileSync(path, options.template.replace(/%file%/g, templateName));
+        fs.writeFileSync(join('migrations', 'sql', templateName + '.up.sql'), '# PLACE YOUR \'UP\' MIGRATION SQL HERE!');
+        fs.writeFileSync(join('migrations', 'sql', templateName + '.down.sql'), '# PLACE YOUR \'DOWN\' MIGRATION SQL HERE!');
+    });
+}
+
+function getUniqueTemplateName(fileName, done) {
+    var check = function(checkCounter, callBack) {
+        var name = fileName + (checkCounter > 0 ? ' (' + checkCounter + ')' : '');
+        fs.stat(join('migrations', 'sql', name + '.up.sql'), function(err) {
+            if (err == null) {
+                callBack(null, checkCounter)
+            } else if (err.code == 'ENOENT') {
+                callBack(name, checkCounter);
+            } else {
+                abort('Error getting unique fileName: ' + err.code);
+            }
+        });
+    };
+
+    check(0, function lambda(uniqueName, counter) {
+        if (uniqueName) {
+            done(uniqueName);
+        } else {
+            if (++counter < 100) {
+                check(counter, lambda);
+            } else {
+                abort('Recursion limit: Unique templateName for SQL-files could not be determined!')
+            }
+        }
+    });
 }
 
 function showHelp() {
