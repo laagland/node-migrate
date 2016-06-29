@@ -28,6 +28,8 @@ var options = {
     force: false,
     redoFile: null,
     seedAfterMigrate: false,
+    seedOnly: false,
+    seedFiles: [],
     template: [
         '\'use strict\';'
         , ''
@@ -52,7 +54,19 @@ var options = {
         , '        next();'
         , '    });'
         , '};'
+        , '%seedStatement%'
+    ].join('\n'),
+    templateSeedOnly: [
+        '\'use strict\';'
         , ''
+        , 'exports.up = function(next) {'
+        , '    next();'
+        , '};'
+        , ''
+        , 'exports.down = function(next) {'
+        , '    next();'
+        , '};'
+        , '%seedStatement%'
     ].join('\n')
 };
 
@@ -76,11 +90,18 @@ while (args.length) {
         case arg.match(/^(-s|--seed)$/i) !== null:
             options.seedAfterMigrate = true;
             break;
+        case arg.match(/^(-so|--seed-only)$/i) !== null:
+            options.seedOnly = true;
+            options.seedAfterMigrate = true;
+            break;        
         case arg.match(/^(-f|--force)$/i) !== null:
             options.force = true;
             break;
         case arg.match(/^\d+.*\.js$/i) !== null:
-            options.file = options.file || arg.match(/^\d+.*\.js$/i);
+            options.file = options.file || arg.match(/^\d+.*\.js$/i)[0];
+            break;
+        case arg.match(/^\d+-.*\.json$/i) !== null:
+            options.seedFiles.push(arg.match(/^\d+-.*\.json$/i)[0]);
             break;
         case arg.match(/^(up|down|seed|redo|list)$/i) !== null:
             options.command = arg.match(/^(up|down|seed|redo|list)$/i)[1].toLowerCase();
@@ -115,8 +136,13 @@ if (~['up', 'down', 'redo', 'list'].indexOf(options.command)) {
         if (!set.migrations || set.migrations.length === 0) {
             abort('There are no migrations found! Create a new migration first by using: \'migrate create\'');
         }
-        set.on('migration', function(migration, direction) {
+        set.on('migration', function(migration, direction, seedFile) {
             log(direction, migration.title);
+            if (direction === 'up' && seedFile) {
+                if (!_.includes(options.seedFiles, seedFile)) {
+                    options.seedFiles.push(seedFile);
+                }
+            }
         });
 
         if (options.command === 'redo' && set.migrations.length > 0) {
@@ -179,9 +205,12 @@ function abort(msg) {
 }
 
 function doSeed() {
-    var dir = path.resolve('tools');
+    if (!options.seedFiles.length) {
+        console.log(chalk.bgRed('No seed files were specified! Nothing to seed...'));
+        process.exit();
+    }
     console.log(chalk.bold('Start seeding...'));
-    require(path.join(dir, 'seed.js'))(function() {
+    require(path.join('migrations', 'seeder', 'seed.js'))(options.seedFiles, function() {
         console.log(chalk.green('Seeding finished!'));
         process.exit();
     });
@@ -342,10 +371,18 @@ function create() {
     getUniqueTemplateName(title, function(templateName) {
         title = title ? curr + '-' + title : curr;
         var path = join('migrations', title + '.js');
+        var template = options.seedOnly ? options.templateSeedOnly : options.template;
         log('create', join(process.cwd(), path));
-        fs.writeFileSync(path, options.template.replace(/%file%/g, templateName));
-        fs.writeFileSync(join('migrations', 'sql', templateName + '.up.sql'), '# PLACE YOUR \'UP\' MIGRATION SQL HERE!');
-        fs.writeFileSync(join('migrations', 'sql', templateName + '.down.sql'), '# PLACE YOUR \'DOWN\' MIGRATION SQL HERE!');
+        template = template.replace(/%file%/g, templateName);
+        template = template.replace(/%seedStatement%/g, (options.seedAfterMigrate ? '\nexports.seedFile = \'' + title +'.json\';\n' : ''));
+        fs.writeFileSync(path, template);
+        if (!options.seedOnly) {
+            fs.writeFileSync(join('migrations', 'sql', templateName + '.up.sql'), '# PLACE YOUR \'UP\' MIGRATION SQL HERE!');
+            fs.writeFileSync(join('migrations', 'sql', templateName + '.down.sql'), '# PLACE YOUR \'DOWN\' MIGRATION SQL HERE!');
+        }
+        if (options.seedAfterMigrate) {
+            fs.writeFileSync(join('migrations', 'seeder', 'data', title + '.json'), '{}');
+        }
     });
 }
 
