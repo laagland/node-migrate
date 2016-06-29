@@ -279,15 +279,17 @@ function doMigration(file, redoFile) {
         if (options.seedAfterMigrate) {
             doSeed();
         } else {
-            console.log(chalk.bgRed('Unprocessed Seed files were detected but --seed flag was not found!'));
-            console.log(chalk.bold('To process the seed files you can either do a \'migrate down\' followed by a \'migrate up -s\''));
-            console.log(chalk.bold('Or execute the following command:'));
-            var seedFiles = [];
-            _.forEach(options.seedFiles, function(seedFile) {
-                var match = seedFile.match(/(\\|\/)((\d+)-.*\.json)/i);
-                seedFiles.push(match ? match[2] : seedFile);
-            });
-            console.log(chalk.green(chalk.bold('migrate seed ' + seedFiles.join(' '))));
+            if (options.seedFiles.length) {
+                console.log(chalk.bgRed('Unprocessed Seed files were detected but --seed flag was not found!'));
+                console.log(chalk.bold('To process the seed files you can either do a \'migrate down\' followed by a \'migrate up -s\''));
+                console.log(chalk.bold('Or execute the following command:'));
+                var seedFiles = [];
+                _.forEach(options.seedFiles, function(seedFile) {
+                    var match = seedFile.match(/(\\|\/)((\d+)-.*\.json)/i);
+                    seedFiles.push(match ? match[2] : seedFile);
+                });
+                console.log(chalk.green(chalk.bold('migrate seed ' + seedFiles.join(' '))));
+            }
             process.exit();
         }
     };
