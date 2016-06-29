@@ -93,7 +93,7 @@ while (args.length) {
         case arg.match(/^(-so|--seed-only)$/i) !== null:
             options.seedOnly = true;
             options.seedAfterMigrate = true;
-            break;        
+            break;
         case arg.match(/^(-f|--force)$/i) !== null:
             options.force = true;
             break;
@@ -101,10 +101,18 @@ while (args.length) {
             options.file = options.file || arg.match(/^\d+.*\.js$/i)[0];
             break;
         case arg.match(/^\d+-.*\.json$/i) !== null:
-            options.seedFiles.push(arg.match(/^\d+-.*\.json$/i)[0]);
+            options.seedFiles.push(path.join(path.resolve('migrations'), 'seeder', 'data', arg.match(/^\d+-.*\.json$/i)[0]));
             break;
         case arg.match(/^(up|down|seed|redo|list)$/i) !== null:
             options.command = arg.match(/^(up|down|seed|redo|list)$/i)[1].toLowerCase();
+            if (options.command === 'seed') {
+                var seedFile = required();
+                if (seedFile.match(/^\d+-.*\.json$/i)) {
+                    options.seedFiles.push(path.join(path.resolve('migrations'), 'seeder', 'data', seedFile.match(/^\d+-.*\.json$/i)[0]));
+                } else {
+                    options.seedFiles.push(seedFile);
+                }
+            }
             break;
         default:
             if (options.command) {
@@ -123,9 +131,24 @@ if (!options.command) {
 }
 options.stateFile = options.stateFile || join('migrations', '.migrate');
 
-// create ./migrations
+// create ./migrations directories
 try {
     fs.mkdirSync('migrations', 0774);
+} catch (err) {
+    // ignore
+}
+try {
+    fs.mkdirSync('migrations/seeder', 0774);
+} catch (err) {
+    // ignore
+}
+try {
+    fs.mkdirSync('migrations/seeder/data', 0774);
+} catch (err) {
+    // ignore
+}
+try {
+    fs.mkdirSync('migrations/sql', 0774);
 } catch (err) {
     // ignore
 }
@@ -136,12 +159,17 @@ if (~['up', 'down', 'redo', 'list'].indexOf(options.command)) {
         if (!set.migrations || set.migrations.length === 0) {
             abort('There are no migrations found! Create a new migration first by using: \'migrate create\'');
         }
-        set.on('migration', function(migration, direction, seedFile) {
+        set.on('migration', function(migration, direction, seedFiles) {
             log(direction, migration.title);
-            if (direction === 'up' && seedFile) {
-                if (!_.includes(options.seedFiles, seedFile)) {
-                    options.seedFiles.push(seedFile);
+            if (direction === 'up' && seedFiles) {
+                if (!_.isArray(seedFiles)) {
+                    seedFiles = [seedFiles];
                 }
+                _.forEach(seedFiles, function(seedFile) {
+                    if (!_.includes(options.seedFiles, seedFile)) {
+                        options.seedFiles.push(path.join(path.resolve('migrations'), 'seeder', 'data', seedFile));
+                    }
+                });
             }
         });
 
@@ -210,7 +238,7 @@ function doSeed() {
         process.exit();
     }
     console.log(chalk.bold('Start seeding...'));
-    require(path.join('./migrations', 'seeder', 'seed.js'))(options.seedFiles, function() {
+    require(path.join(path.resolve('migrations'), 'seeder', 'seed.js'))(options.seedFiles, function() {
         console.log(chalk.green('Seeding finished!'));
         process.exit();
     });
@@ -370,18 +398,18 @@ function create() {
 
     getUniqueTemplateName(title, function(templateName) {
         title = title ? curr + '-' + title : curr;
-        var path = join('migrations', title + '.js');
+        var path = join(path.resolve('migrations'), title + '.js');
         var template = options.seedOnly ? options.templateSeedOnly : options.template;
-        log('create', join(process.cwd(), path));
+        log('create', path);
         template = template.replace(/%file%/g, templateName);
-        template = template.replace(/%seedStatement%/g, (options.seedAfterMigrate ? '\nexports.seedFile = \'' + title +'.json\';\n' : ''));
+        template = template.replace(/%seedStatement%/g, (options.seedAfterMigrate ? '\nexports.seedFiles = [\'' + title + '.json\'];\n' : ''));
         fs.writeFileSync(path, template);
         if (!options.seedOnly) {
-            fs.writeFileSync(join('migrations', 'sql', templateName + '.up.sql'), '# PLACE YOUR \'UP\' MIGRATION SQL HERE!');
-            fs.writeFileSync(join('migrations', 'sql', templateName + '.down.sql'), '# PLACE YOUR \'DOWN\' MIGRATION SQL HERE!');
+            fs.writeFileSync(join(path.resolve('migrations'), 'sql', templateName + '.up.sql'), '# PLACE YOUR \'UP\' MIGRATION SQL HERE!');
+            fs.writeFileSync(join(path.resolve('migrations'), 'sql', templateName + '.down.sql'), '# PLACE YOUR \'DOWN\' MIGRATION SQL HERE!');
         }
         if (options.seedAfterMigrate) {
-            fs.writeFileSync(join('migrations', 'seeder', 'data', title + '.json'), '{}');
+            fs.writeFileSync(join(path.resolve('migrations'), 'seeder', 'data', title + '.json'), '{}');
         }
     });
 }
