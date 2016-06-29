@@ -269,6 +269,15 @@ function doMigration(file, redoFile) {
         if (options.seedAfterMigrate) {
             doSeed();
         } else {
+            console.log(chalk.bgRed('Unprocessed Seed files were detected but --seed flag was not found!'));
+            console.log(chalk.bold('To process the seed files you can either do a \'migrate down\' followed by a \'migrate up -s\''));
+            console.log(chalk.bold('Or execute the following command:'));
+            var seedFiles = [];
+            _.forEach(options.seedFiles, function(seedFile) {
+                var match = seedFile.match(/(\\|\/)((\d+)-.*\.json)/i);
+                seedFiles.push(match ? match[2] : seedFile);
+            });
+            console.log(chalk.green(chalk.bold('migrate seed ' + seedFiles.join(' '))));
             process.exit();
         }
     };
@@ -402,7 +411,8 @@ function create() {
         var template = options.seedOnly ? options.templateSeedOnly : options.template;
         log('create', filePath);
         template = template.replace(/%file%/g, templateName);
-        template = template.replace(/%seedStatement%/g, (options.seedAfterMigrate ? '\nexports.seedFiles = [\'' + title + '.json\'];\n' : ''));
+        var comment = '\n/*\n * Specify only file names. Files are expected to reside in the directory ./migrations/seeder/data/\n */\n';
+        template = template.replace(/%seedStatement%/g, comment + (options.seedAfterMigrate ? 'exports.seedFiles = [\'' + title + '.json\'];\n' : 'exports.seedFiles = [];\n'));
         fs.writeFileSync(filePath, template);
         if (!options.seedOnly) {
             fs.writeFileSync(join(path.resolve('migrations'), 'sql', templateName + '.up.sql'), '# PLACE YOUR \'UP\' MIGRATION SQL HERE!');
@@ -448,12 +458,13 @@ function showHelp() {
     console.log(chalk.bold('* ') + '');
     console.log(chalk.bold('* ') + chalk.bold('Command:'));
     console.log(chalk.bold('* '));
-    console.log(chalk.bold('* ') + ' up     [name]  migrate up till given migration (the default command)');
-    console.log(chalk.bold('* ') + ' down   [name]  migrate down till given migration');
-    console.log(chalk.bold('* ') + ' create [name]  create a new migrate');
-    console.log(chalk.bold('* ') + ' redo   [name]  migrate down till given migration and back up again to where it migrated down from.');
-    console.log(chalk.bold('* ') + ' list           shows all available migrations and their current processing state.');
-    console.log(chalk.bold('* ') + ' seed           using \'seed\' as a command results in ' + chalk.bold('\'seeding\'') + ' only.');
+    console.log(chalk.bold('* ') + ' up     [name]     migrate up till given migration (the default command)');
+    console.log(chalk.bold('* ') + ' down   [name]     migrate down till given migration');
+    console.log(chalk.bold('* ') + ' create [name]     create a new migration. Will also create .sql files to put the actual migration scripts in.');
+    console.log(chalk.bold('* ') + ' redo   [name]     migrate down till given migration and back up again to where it migrated down from.');
+    console.log(chalk.bold('* ') + ' list              shows all available migrations and their current processing state.');
+    console.log(chalk.bold('* ') + ' seed   [name...]  using \'seed\' as a command results in ' + chalk.bold('\'seeding\'') + ' only.');
+    console.log(chalk.bold('* ') + '                   You need to specify at least 1 file to seed!');
     console.log(chalk.bold('* '));
     console.log(chalk.bold('* name: ') + 'This is the filename of the migration.');
     console.log(chalk.bold('* ') + '      When the ' + chalk.bold('filename') + ' is omitted and there is more than 1 file available, you will be');
@@ -466,6 +477,8 @@ function showHelp() {
     console.log(chalk.bold('* ') + ' --template-file <path>  set path to template file to use for new migrations');
     console.log(chalk.bold('* ') + ' -f, --force             passing this option asks no questions and goes all the way up or down!');
     console.log(chalk.bold('* ') + ' -s, --seed              using \'seed\' as an option will perform ' + chalk.bold('\'seeding\'') + ' when ' + chalk.bold('\'migrating\'') + ' has finished!)');
+    console.log(chalk.bold('* ') + '                         when specified in conjunction with the ' + chalk.bold('\'create\'') + ' command, an empty seed file will also be created!)');
+    console.log(chalk.bold('* ') + ' -so, --seed-only        only valid with the ' + chalk.bold('\'create\'') + ' command. Will create an empty seed file and no migration files');
     console.log(chalk.bold('* '));
     console.log(chalk.bold('* Some examples:'));
     console.log(chalk.bold('* '));
