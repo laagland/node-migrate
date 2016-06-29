@@ -210,7 +210,7 @@ function doSeed() {
         process.exit();
     }
     console.log(chalk.bold('Start seeding...'));
-    require(path.join('migrations', 'seeder', 'seed.js'))(options.seedFiles, function() {
+    require(path.join('./migrations', 'seeder', 'seed.js'))(options.seedFiles, function() {
         console.log(chalk.green('Seeding finished!'));
         process.exit();
     });
