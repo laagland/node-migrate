@@ -398,12 +398,12 @@ function create() {
 
     getUniqueTemplateName(title, function(templateName) {
         title = title ? curr + '-' + title : curr;
-        var path = join(path.resolve('migrations'), title + '.js');
+        var filePath = join(path.resolve('migrations'), title + '.js');
         var template = options.seedOnly ? options.templateSeedOnly : options.template;
-        log('create', path);
+        log('create', filePath);
         template = template.replace(/%file%/g, templateName);
         template = template.replace(/%seedStatement%/g, (options.seedAfterMigrate ? '\nexports.seedFiles = [\'' + title + '.json\'];\n' : ''));
-        fs.writeFileSync(path, template);
+        fs.writeFileSync(filePath, template);
         if (!options.seedOnly) {
             fs.writeFileSync(join(path.resolve('migrations'), 'sql', templateName + '.up.sql'), '# PLACE YOUR \'UP\' MIGRATION SQL HERE!');
             fs.writeFileSync(join(path.resolve('migrations'), 'sql', templateName + '.down.sql'), '# PLACE YOUR \'DOWN\' MIGRATION SQL HERE!');
