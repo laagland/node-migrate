@@ -25,6 +25,7 @@ var args = process.argv.slice(2);
 
 var options = {
     args: [],
+    isProdEnvironment: true,
     force: false,
     redoFile: null,
     seedAfterMigrate: false,
@@ -69,6 +70,12 @@ var options = {
         , '%seedStatement%'
     ].join('\n')
 };
+
+try {
+    options.isProdEnvironment = _.get(require(join(path.resolve('lib'), 'config.js')), 'client.host', 'client.mobilea.nl') === 'client.mobilea.nl';
+} catch (err) {
+    options.isProdEnvironment = true;
+}
 
 // parse arguments
 
@@ -194,6 +201,9 @@ switch (options.command) {
     case 'up':
     case 'down':
     case 'redo':
+        if (options.command !== 'up') {
+            abortOnProd();
+        }
         if (options.file) {
             handleSelectedFile(options.file, options.redoFile);
         } else {
@@ -304,6 +314,12 @@ function doMigration(file, redoFile) {
         default:
             abort('doMigration() Unknown command!');
             break;
+    }
+}
+
+function abortOnProd() {
+    if (options.isProdEnvironment) {
+        abort('Command: \'' + chalk.bold(options.command) + '\' is not allowed in a PRODUCTION environment!');
     }
 }
 
