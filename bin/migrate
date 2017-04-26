@@ -163,9 +163,11 @@ try {
 if (~['up', 'down', 'redo', 'list'].indexOf(options.command)) {
     try {
         set = migrate.load(options.stateFile, 'migrations');
+        console.log(chalk.bgRed('step1'));
         if (!set.migrations || set.migrations.length === 0) {
             abort('There are no migrations found! Create a new migration first by using: \'migrate create\'');
         }
+        console.log(chalk.bgRed('step2'));
         set.on('migration', function(migration, direction, seedFiles) {
             log(direction, migration.title);
             if (direction === 'up' && seedFiles) {
@@ -179,10 +181,12 @@ if (~['up', 'down', 'redo', 'list'].indexOf(options.command)) {
                 });
             }
         });
-
+        
+        console.log(chalk.bgRed('step3'));
         if (options.command === 'redo' && set.migrations.length > 0) {
             options.redoFile = set.migrations[set.pos - 1].title
         }
+        console.log(chalk.bgRed('step4'));
         // check if the specified file is a valid file in the migration set.
         if (options.file) {
             if (!_.find(set.migrations, function(migration) {
@@ -192,6 +196,7 @@ if (~['up', 'down', 'redo', 'list'].indexOf(options.command)) {
                 options.file = null;
             }
         }
+        console.log(chalk.bgRed('step5'));
     } catch (e) {
         abort('Unable to initialize migrations -> Exiting!');
     }
